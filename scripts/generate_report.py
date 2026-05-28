@@ -3,14 +3,13 @@ import os
 import re
 import sys
 
-from google import genai
-from google.genai import types
+from openai import OpenAI
 
 
 REPORT_PROMPT = """\
 你是一个专门为心理学研究生搜集实习招聘信息的助手。今天是 {date}。
 
-请通过搜索，查找当前面向心理学研究生开放的企业实习岗位，重点关注：
+请根据你掌握的知识，整理当前面向心理学研究生开放的企业实习岗位，重点关注：
 1. 互联网大厂（腾讯、字节跳动、阿里巴巴、华为、美团、顺丰科技等）的用户研究/UX/产品/HR 方向
 2. EAP 服务商（亚太 EAP、中智关爱通、壹心理等）
 3. 心理测评 / HR 科技公司（北森、CDP 等）
@@ -39,6 +38,7 @@ REPORT_PROMPT = """\
 
 | 公司名称 | 岗位名称 | 工作地点 | 实习薪资 | 实习时长 | 投递渠道/链接 | 心理学适配度 | 备注 |
 |------|------|------|------|------|------|------|------|
+| （填写具体公司和岗位） | | | | | | | |
 
 ---
 
@@ -46,6 +46,7 @@ REPORT_PROMPT = """\
 
 | 公司名称 | 岗位名称 | 工作地点 | 实习薪资 | 实习时长 | 投递渠道/链接 | 心理学适配度 | 备注 |
 |------|------|------|------|------|------|------|------|
+| （填写具体公司和岗位） | | | | | | | |
 
 ---
 
@@ -53,6 +54,7 @@ REPORT_PROMPT = """\
 
 | 公司名称 | 岗位名称 | 工作地点 | 实习薪资 | 实习时长 | 投递渠道/链接 | 心理学适配度 | 备注 |
 |------|------|------|------|------|------|------|------|
+| （填写具体公司和岗位） | | | | | | | |
 
 ---
 
@@ -61,31 +63,38 @@ REPORT_PROMPT = """\
 | 优先级 | 岗位类型 | 推荐公司 | 理由 |
 |------|------|------|------|
 | ⭐⭐⭐ | 用户研究实习生 | ... | ... |
+| ⭐⭐⭐ | HR实习生 | ... | ... |
+| ⭐⭐ | 产品实习生 | ... | ... |
 
 ## 今日数据说明
 
 - 薪资信息部分来自公开求职社区及新闻，实际以录用后沟通为准
 - 各公司招聘周期不同，建议尽快投递，部分岗位招满即止
+- 武汉本地岗位已在工作地点栏注明
 
 ## 数据来源
 
-- [来源名称](链接)
+- [实习僧](https://www.shixiseng.com/)
+- [BOSS直聘校招](https://www.zhipin.com/campus/)
+- [牛客校招](https://www.nowcoder.com/discuss/school-recruit)
+- [武汉本地宝](https://wh.bendibao.com/)
 """
 
 
 def generate_report(date_str: str) -> str:
-    client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
-
-    response = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=REPORT_PROMPT.format(date=date_str),
-        config=types.GenerateContentConfig(
-            tools=[types.Tool(google_search=types.GoogleSearch())],
-            temperature=0.3,
-        ),
+    client = OpenAI(
+        api_key=os.environ["SILICONFLOW_API_KEY"],
+        base_url="https://api.siliconflow.cn/v1",
     )
 
-    result = response.text
+    response = client.chat.completions.create(
+        model="deepseek-ai/DeepSeek-V3",
+        messages=[{"role": "user", "content": REPORT_PROMPT.format(date=date_str)}],
+        max_tokens=4000,
+        temperature=0.3,
+    )
+
+    result = response.choices[0].message.content
     if not result or not result.strip():
         raise ValueError("Generated report is empty")
 

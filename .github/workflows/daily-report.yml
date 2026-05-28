@@ -21,11 +21,11 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install google-genai
+        run: pip install openai
 
       - name: Generate daily report
         env:
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
         run: python scripts/generate_report.py
 
       - name: Commit and push
