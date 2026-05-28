@@ -21,11 +21,11 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install anthropic
+        run: pip install google-genai
 
       - name: Generate daily report
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: python scripts/generate_report.py
 
       - name: Commit and push

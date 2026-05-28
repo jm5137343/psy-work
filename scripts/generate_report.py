@@ -1,14 +1,16 @@
-import anthropic
 import datetime
 import os
 import re
 import sys
 
+from google import genai
+from google.genai import types
+
 
 REPORT_PROMPT = """\
 你是一个专门为心理学研究生搜集实习招聘信息的助手。今天是 {date}。
 
-请通过网络搜索，查找当前面向心理学研究生开放的企业实习岗位，重点关注：
+请通过搜索，查找当前面向心理学研究生开放的企业实习岗位，重点关注：
 1. 互联网大厂（腾讯、字节跳动、阿里巴巴、华为、美团、顺丰科技等）的用户研究/UX/产品/HR 方向
 2. EAP 服务商（亚太 EAP、中智关爱通、壹心理等）
 3. 心理测评 / HR 科技公司（北森、CDP 等）
@@ -21,9 +23,7 @@ REPORT_PROMPT = """\
 - 接受无经验、研一在读学生，不限全日制
 - 搜索渠道：实习僧、BOSS 直聘、牛客校招、各公司官网、武汉本地宝
 
-请按以下格式输出完整报告（Markdown 格式，不要输出任何额外的解释或前言）：
-
----
+请直接输出完整的 Markdown 报告，不要有任何额外前言：
 
 # 心理学研究生实习招聘日报 {date}
 
@@ -39,7 +39,6 @@ REPORT_PROMPT = """\
 
 | 公司名称 | 岗位名称 | 工作地点 | 实习薪资 | 实习时长 | 投递渠道/链接 | 心理学适配度 | 备注 |
 |------|------|------|------|------|------|------|------|
-| 公司 | 岗位 | 地点 | 薪资 | 时长 | [链接文字](实际链接) | 高/中/低 | 备注 |
 
 ---
 
@@ -75,29 +74,19 @@ REPORT_PROMPT = """\
 
 
 def generate_report(date_str: str) -> str:
-    client = anthropic.Anthropic()
+    client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
 
-    response = client.beta.messages.create(
-        model="claude-opus-4-7",
-        max_tokens=8000,
-        betas=["web-search-2025-03-05"],
-        tools=[{
-            "type": "web_search_20250305",
-            "name": "web_search",
-            "max_uses": 15,
-        }],
-        messages=[{
-            "role": "user",
-            "content": REPORT_PROMPT.format(date=date_str),
-        }],
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=REPORT_PROMPT.format(date=date_str),
+        config=types.GenerateContentConfig(
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+            temperature=0.3,
+        ),
     )
 
-    result = ""
-    for block in response.content:
-        if hasattr(block, "type") and block.type == "text":
-            result += block.text
-
-    if not result.strip():
+    result = response.text
+    if not result or not result.strip():
         raise ValueError("Generated report is empty")
 
     return result.strip()
@@ -107,8 +96,7 @@ def count_jobs(report_content: str) -> str:
     match = re.search(r"合计\s+\*\*(\d+)\s*个\*\*", report_content)
     if match:
         return match.group(1)
-    matches = re.findall(r"\|\s*[^|]+\s*\|\s*[^|]+实习[^|]*\|", report_content)
-    return str(max(0, len(matches) - 1))
+    return "?"
 
 
 def update_readme(date_str: str, job_count: str):
@@ -117,8 +105,8 @@ def update_readme(date_str: str, job_count: str):
         content = f.read()
 
     new_row = f"| {date_str} | [心理学研究生实习招聘日报 {date_str}](./reports/{date_str}.md) | {job_count} 个 |"
-
     separator = "|------|----------|--------|"
+
     if separator in content and new_row not in content:
         content = content.replace(
             separator + "\n",
