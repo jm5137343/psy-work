@@ -2,7 +2,7 @@ name: Daily Internship Report
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 每天 00:00 UTC = 北京时间 08:00
+    - cron: '0 1 * * *'  # 每天 01:00 UTC = 北京时间 09:00
   workflow_dispatch:      # 支持手动触发
 
 jobs:
@@ -20,8 +20,11 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
-        run: pip install openai
+      - name: Install Python dependencies
+        run: pip install openai playwright beautifulsoup4
+
+      - name: Install Playwright browser
+        run: playwright install --with-deps chromium
 
       - name: Generate daily report
         env:
